@@ -1,0 +1,80 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:product_group_name",
+ "creation": "2025-09-27 14:15:21.963753",
+ "description": "Group multiple items for Deals and Offers",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "product_group_name",
+  "column_break_tmrw",
+  "apply_group_discount",
+  "group_discount_per",
+  "section_break_axqw",
+  "group_items"
+ ],
+ "fields": [
+  {
+   "fieldname": "product_group_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Product Group Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "column_break_tmrw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "apply_group_discount",
+   "fieldtype": "Check",
+   "label": "Apply Group Discount"
+  },
+  {
+   "fieldname": "group_discount_per",
+   "fieldtype": "Percent",
+   "label": "Group Discount %",
+   "mandatory_depends_on": "eval:doc.apply_group_discount;"
+  },
+  {
+   "fieldname": "section_break_axqw",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "group_items",
+   "fieldtype": "Table",
+   "label": "Group Items",
+   "options": "Product Group Item"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-09-27 14:30:24.985723",
+ "modified_by": "Administrator",
+ "module": "Ecommerce",
+ "name": "Product Group",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

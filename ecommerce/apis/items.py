@@ -93,3 +93,27 @@ def get_composite_items(bundle_category):
     
     except Exception as e:
         return str(e)
+
+@frappe.whitelist()
+def get_popular_item_groups():
+    try:
+        item_groups = frappe.db.get_all(
+            "Item Group",
+            filters={"ecom_is_popular": True},
+            fields=["name", "item_group_name", "image"]
+        )
+        
+        result = {"categories":[]}
+        for item in item_groups:
+            result["categories"].append({
+                "category_id": item.name,
+                "category_name": item.item_group_name,
+                "category_image_url": frappe.utils.get_url(item.image) if item.image else None
+            })
+
+        frappe.local.response.update(result)
+        
+        return
+
+    except Exception as e:
+        return {"exception": str(e)}

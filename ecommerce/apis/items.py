@@ -117,3 +117,29 @@ def get_popular_item_groups():
 
     except Exception as e:
         return {"exception": str(e)}
+    
+@frappe.whitelist()
+def get_product_group_items(group_name):
+    try:
+        group = frappe.get_doc("Product Group", group_name)
+
+        item_count = len(group.group_items)
+
+        result = {
+            "item_count": item_count,
+            "items": []
+        }
+
+        for item in group.group_items:
+            result['items'].append({
+                "item_id": item.item,
+                "item_name": item.item_name,
+                "std_sell_price": item.standard_selling_price or 0,
+                "discount": group.group_discount_per if group.apply_group_discount else item.group_item_discount_per or 0,
+                "dicount_sell_price": item.price_after_discount or 0
+            })
+
+        frappe.local.response.update(result)
+
+    except Exception as e:
+        return {"exception": str(e)}

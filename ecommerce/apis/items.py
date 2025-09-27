@@ -74,3 +74,22 @@ def get_most_sold_items(from_date=None, to_date=None, sort_by="quantity", limit=
 
     except Exception as e:
         return str(e)
+    
+@frappe.whitelist()
+def get_composite_items(bundle_category):
+    try:
+        combo_items = frappe.db.get_all("Product Bundle",
+                    filters={"ecom_product_bundle_category": bundle_category},
+                    fields=["name", "new_item_code"])
+        
+        result = []
+        for item in combo_items:
+            result.append({
+                "bundle_id": item.name,
+                "parent_item": item.new_item_code
+            })
+
+        return result
+    
+    except Exception as e:
+        return str(e)

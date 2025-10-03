@@ -24,3 +24,10 @@ def get_image_set(set_name):
         return
     except Exception as e:
         return str(e)
+    
+@frappe.whitelist()
+def home_page():
+    try:
+        home_ad_1 = get_image_set("Top Banner - Home")
+    except Exception as e:
+        return {"exception": str(e)}

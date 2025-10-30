@@ -65,9 +65,7 @@ def get_most_sold_items(from_date=None, to_date=None, sort_by="quantity", limit=
             item['standard_selling_price'] = item_price or 0
 
         frappe.local.response.update({
-            "data": {
-                "items": items
-            }
+            "most_sold_items": items
         })
 
         return
@@ -89,7 +87,11 @@ def get_composite_items(bundle_category):
                 "parent_item": item.new_item_code
             })
 
-        return result
+        frappe.local.response.update({
+            bundle_category: result
+        })
+
+        return
     
     except Exception as e:
         return str(e)
@@ -103,9 +105,9 @@ def get_popular_item_groups():
             fields=["name", "item_group_name", "image"]
         )
         
-        result = {"categories":[]}
+        result = {"popular_categories":[]}
         for item in item_groups:
-            result["categories"].append({
+            result["popular_categories"].append({
                 "category_id": item.name,
                 "category_name": item.item_group_name,
                 "category_image_url": frappe.utils.get_url(item.image) if item.image else None
@@ -120,12 +122,16 @@ def get_popular_item_groups():
     
 @frappe.whitelist()
 def get_product_group_items(group_name):
+    """
+    List of single items that come under a deal or offer
+    """
     try:
         group = frappe.get_doc("Product Group", group_name)
 
         item_count = len(group.group_items)
 
         result = {
+            "group_name": group_name,
             "item_count": item_count,
             "items": []
         }

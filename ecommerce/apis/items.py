@@ -1,5 +1,6 @@
 import frappe
 from frappe.utils import getdate
+from erpnext.stock.utils import get_stock_balance
 
 @frappe.whitelist()
 def get_most_sold_items(from_date=None, to_date=None, sort_by="quantity", limit=10):
@@ -146,6 +147,85 @@ def get_product_group_items(group_name):
             })
 
         frappe.local.response.update(result)
+
+    except Exception as e:
+        return {"exception": str(e)}
+    
+@frappe.whitelist()
+def get_single_item(item_code):
+    """
+    Fetch details of a single item by item code
+    """
+    try:
+        item = frappe.get_doc("Item", item_code)
+
+        item_price = frappe.db.get_value(
+            'Item Price',
+            {
+                'item_code': item.item_code,
+                'selling': 1,
+                'price_list': frappe.db.get_single_value('Selling Settings', 'selling_price_list')
+            },
+            'price_list_rate'
+        )
+
+        nutrients_dict = {
+            row.get("nutrient"): row.get("quantity")
+            for row in item.get("custom_nutritional_highlights", [])
+        }
+
+        warehouses = frappe.db.get_all(
+            "Bin",
+            filters={"item_code": item.item_code},
+            pluck="warehouse",
+        ) or []
+
+        available_stock = 0
+        for warehouse in warehouses:
+            available_stock += get_stock_balance(item.item_code, warehouse) or 0
+
+        selling_price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list")
+        selling_price = frappe.db.get_value(
+            "Item Price",
+            {
+                "item_code": item.item_code,
+                "price_list": selling_price_list,
+            },
+            "price_list_rate"
+        ) or 0
+
+        images_dict = {
+            index: frappe.utils.get_url(row.get("image"))
+            for index, row in enumerate(item.get("custom_item_images"))
+        }
+
+        result = {
+            "item_code": item.item_code,
+            "item_name": item.item_name,
+            "brand_name": item.brand,
+            "category_name": item.item_group,
+            "unit_name": item.stock_uom,
+            "variants": {
+                "flavour": item.custom_flavor_variant or "",
+                "weight": item.custom_weight_variant or "" ,
+            },
+            "specifications": {
+                "nutritional_highlights": nutrients_dict,
+            },
+            "available_stock": available_stock,
+            "selling_price": selling_price or 0,
+            "custom_description": {
+                "product_overview": item.custom_overview,
+                "benefits": item.custom_benefits,
+                "suggested_use": item.custom_suggested_use,
+                "description": item.custom_item_description,
+            },
+            "images": images_dict
+        }
+
+        frappe.local.response.update(result)
+
+        return
 
     except Exception as e:
         return {"exception": str(e)}

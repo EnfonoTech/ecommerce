@@ -210,6 +210,7 @@ def get_single_item(item_code):
             "brand_name": item.brand,
             "category_name": item.item_group,
             "unit_name": item.stock_uom,
+            "is_assured": item.custom_is_assured,
             "variants": {
                 "flavour": item.custom_flavor_variant or "",
                 "weight": item.custom_weight_variant or "" ,
@@ -218,8 +219,12 @@ def get_single_item(item_code):
                 "nutritional_highlights": nutrients_dict,
                 "product_specifications": product_specifications_dict,
             },
+            "disabled": item.disabled,
             "available_stock": available_stock,
+            "minimum_order_quantity": item.min_order_qty or 0,
+            "safety_stock": item.safety_stock or 0,
             "selling_price": selling_price or 0,
+            "maximum_price": item.custom_max_selling_price or 0,
             "custom_description": {
                 "product_overview": item.custom_overview,
                 "benefits": item.custom_benefits,

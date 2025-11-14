@@ -195,7 +195,7 @@ def get_single_item(item_code):
         ) or 0
 
         images_dict = {
-            index: frappe.utils.get_url(row.get("image"))
+            index: {"is_default": row.is_default, "image_title": row.image_title, "image_url": frappe.utils.get_url(row.get("image"))}
             for index, row in enumerate(item.get("custom_item_images"))
         }
 

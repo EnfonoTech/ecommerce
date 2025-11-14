@@ -174,6 +174,11 @@ def get_single_item(item_code):
             for row in item.get("custom_nutritional_highlights", [])
         }
 
+        product_specifications_dict = {
+            row.get("product_spec"): row.get("value")
+            for row in item.get("custom_product_specifications", [])
+        }
+
         warehouses = frappe.db.get_all(
             "Bin",
             filters={"item_code": item.item_code},
@@ -195,7 +200,7 @@ def get_single_item(item_code):
         ) or 0
 
         images_dict = {
-            int(index): {"is_default": row.is_default, "image_title": row.image_title, "image_url": frappe.utils.get_url(row.get("image"))}
+            index: {"is_default": row.get("is_default"), "image_title": row.get("image_title"), "image_url": frappe.utils.get_url(row.get("image"))}
             for index, row in enumerate(item.get("custom_item_images"))
         }
 
@@ -211,6 +216,7 @@ def get_single_item(item_code):
             },
             "specifications": {
                 "nutritional_highlights": nutrients_dict,
+                "product_specifications": product_specifications_dict,
             },
             "available_stock": available_stock,
             "selling_price": selling_price or 0,

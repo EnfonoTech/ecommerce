@@ -211,6 +211,7 @@ def get_single_item(item_code):
             "category_name": item.item_group,
             "unit_name": item.stock_uom,
             "is_assured": item.custom_is_assured,
+            "base_item_name": item.custom_base_item_name,
             "variants": {
                 "flavour": item.custom_flavor_variant or "",
                 "weight": item.custom_weight_variant or "" ,
@@ -228,9 +229,9 @@ def get_single_item(item_code):
             "custom_description": {
                 "product_overview": item.custom_overview,
                 "benefits": item.custom_benefits,
-                "suggested_use": item.custom_suggested_use,
-                "description": item.custom_item_description,
+                "suggested_use": item.custom_suggested_use
             },
+            "description": item.custom_item_description,
             "images": images_dict
         }
 

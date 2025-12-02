@@ -1,0 +1,48 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-12-02 13:55:22.607807",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "website_base_url",
+  "api_token"
+ ],
+ "fields": [
+  {
+   "fieldname": "api_token",
+   "fieldtype": "Password",
+   "label": "API Token"
+  },
+  {
+   "fieldname": "website_base_url",
+   "fieldtype": "Data",
+   "label": "Website Base URL"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-12-02 14:49:35.841237",
+ "modified_by": "Administrator",
+ "module": "Ecommerce",
+ "name": "Ecommerce Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

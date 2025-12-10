@@ -240,3 +240,26 @@ doc_events = {
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
 
+fixtures = [
+			{
+				"dt": "Custom Field", 
+				"filters": {
+							"dt": "Sales Order",
+							"fieldname": "custom_email"
+						}
+			},
+			{
+				"dt": "Custom Field", 
+				"filters": {
+							"dt": "Sales Order",
+							"fieldname": "custom_phone"
+						}
+			},
+			{
+				"dt": "Custom Field", 
+				"filters": {
+							"dt": "Sales Order",
+							"fieldname": "custom_wallet_points"
+						}
+			}
+		]

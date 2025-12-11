@@ -241,3 +241,96 @@ def get_single_item(item_code):
 
     except Exception as e:
         return {"exception": str(e)}
+
+
+@frappe.whitelist()
+def get_items_details(item_codes=None):
+    """
+    Fetch details of multiple items by item codes
+    """
+    try:
+
+        # Get from form_dict if not provided
+        if not item_codes:
+            item_codes = frappe.form_dict.get("item_codes", [])
+
+        item_codes = frappe.parse_json(item_codes)
+        
+        if len(item_codes) == 0:
+            frappe.throw("At least one item_code is required")
+        
+        selling_price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list")
+        
+        result = []
+        
+        for item_code in item_codes:
+            try:
+                # Check if item exists
+                if not frappe.db.exists("Item", item_code):
+                    result.append({
+                        "item_code": item_code,
+                        "error": "Item not found"
+                    })
+                    continue
+                
+                item = frappe.get_doc("Item", item_code)
+                
+                # Get selling price
+                selling_price = frappe.db.get_value(
+                    "Item Price",
+                    {
+                        "item_code": item.item_code,
+                        "price_list": selling_price_list,
+                    },
+                    "price_list_rate"
+                ) or 0
+                
+                # Get warehouses and calculate available stock
+                warehouses = frappe.db.get_all(
+                    "Bin",
+                    filters={"item_code": item.item_code},
+                    pluck="warehouse",
+                ) or []
+                
+                available_stock = 0
+                for warehouse in warehouses:
+                    available_stock += get_stock_balance(item.item_code, warehouse) or 0
+                
+                # Build item details
+                item_details = {
+                    "item_code": item.item_code,
+                    "item_name": item.item_name,
+                    "base_item_name": item.custom_base_item_name or "",
+                    "category_name": item.item_group or "",
+                    "unit_name": item.stock_uom or "",
+                    "is_assured": item.custom_is_assured,
+                    "available_stock": available_stock,
+                    "selling_price": selling_price,
+                    "maximum_price": item.custom_max_selling_price or 0,
+                }
+                
+                result.append(item_details)
+
+            
+                
+            except Exception as e:
+                result.append({
+                    "item_code": item_code,
+                    "error": str(e)
+                })
+
+        frappe.local.response.update(
+            {
+                "items": result
+            }
+        )
+
+        return
+        
+    except Exception as e:
+        frappe.log_error(
+            message=f"Error fetching items details: {str(e)}",
+            title="Get Items Details Error"
+        )
+        return {"exception": str(e)}
+

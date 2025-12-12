@@ -68,6 +68,7 @@ def sync_item_to_external_api(doc, method):
     result = {
         "item_code": item.item_code,
         "item_name": item.item_name,
+        "base_item_name": item.custom_base_item_name or None,
         "brand_name": item.brand or "",
         "category_name": item.item_group or "",
         "unit_name": item.stock_uom or "",

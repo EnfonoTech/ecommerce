@@ -3,13 +3,10 @@ import json
 from frappe.integrations.utils import make_post_request
 from erpnext.stock.utils import get_stock_balance
 
-def sync_item_to_external_api(doc, method):
+def _sync_single_item_to_api(item, throw_on_error=True):
     """
-    Sync item data to external API webhook when item is saved
-    Prevents saving if webhook request fails
+    Internal helper function to sync a single item to external API
     """
-    item = doc
-
     # Get item price
     selling_price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list")
     selling_price = frappe.db.get_value(
@@ -132,7 +129,7 @@ def sync_item_to_external_api(doc, method):
         )
 
         frappe.msgprint(f"Item {item.item_code} sucessfully synced", alert=True)
-
+        frappe.logger("ecommerce").info(f"Item {item.item_code} synced successfully to external API")
         return response
         
     except Exception as e:
@@ -142,8 +139,49 @@ def sync_item_to_external_api(doc, method):
             message=f"Error syncing item {item.item_code} to external API: {error_message}",
             title="Item Sync Error"
         )
-        # Throw validation error to prevent saving
-        frappe.throw(
-            f"Failed to sync item to external API. Please check the item data and try again. Error: {error_message}",
-            title="Webhook Sync Failed"
-        )
+        # Throw validation error to prevent saving if required
+        if throw_on_error:
+            frappe.throw(
+                f"Failed to sync item to external API. Please check the item data and try again. Error: {error_message}",
+                title="Webhook Sync Failed"
+            )
+
+
+def sync_item_to_external_api(doc, method):
+    """
+    Sync item data to external API webhook when item is saved
+    Prevents saving if webhook request fails
+    """
+    item = doc
+    _sync_single_item_to_api(item, throw_on_error=True)
+
+
+def sync_items_on_material_receipt(doc, method):
+    """
+    Hook for Stock Entry on_submit.
+    If purpose is 'Material Receipt', sync all items in the entry.
+    Errors are logged but don't block the Stock Entry submission.
+    """
+    if getattr(doc, "purpose", None) != "Material Receipt":
+        return
+
+    # Get unique item codes from the Stock Entry
+    item_codes = set()
+    for row in doc.get("items", []):
+        item_code = row.get("item_code")
+        if item_code:
+            item_codes.add(item_code)
+    
+    if not item_codes:
+        return
+
+    # Sync each item (don't throw errors to avoid blocking Stock Entry submission)
+    for item_code in item_codes:
+        try:
+            item_doc = frappe.get_doc("Item", item_code)
+            _sync_single_item_to_api(item_doc, throw_on_error=True)
+        except Exception as e:
+            frappe.log_error(
+                message=f"Error syncing item {item_code} after Material Receipt {doc.name}: {str(e)}",
+                title="Item Sync Error"
+            )

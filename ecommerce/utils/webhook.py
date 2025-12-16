@@ -185,3 +185,23 @@ def sync_items_on_material_receipt(doc, method):
                 message=f"Error syncing item {item_code} after Material Receipt {doc.name}: {str(e)}",
                 title="Item Sync Error"
             )
+
+
+def sync_item_on_price_change(doc, method):
+    """
+    Hook for Item Price: after_insert and on_update.
+    Sync the related Item when its price changes.
+    """
+    item_code = doc.item_code if hasattr(doc, "item_code") else None
+    if not item_code:
+        return
+
+    try:
+        item_doc = frappe.get_doc("Item", item_code)
+        _sync_single_item_to_api(item_doc, throw_on_error=True)
+
+    except Exception as e:
+        frappe.log_error(
+            message=f"Error syncing item {item_code} after price change: {str(e)}",
+            title="Item Price Sync Error"
+        )

@@ -143,6 +143,10 @@ doc_events = {
 	},
 	"Stock Entry": {
 		"on_submit": "ecommerce.utils.webhook.sync_items_on_material_receipt"
+	},
+	"Item Price": {
+		"after_insert": "ecommerce.utils.webhook.sync_item_on_price_change",
+		"on_update": "ecommerce.utils.webhook.sync_item_on_price_change"
 	}
 }
 

@@ -2,6 +2,7 @@ import frappe
 import json
 from frappe.integrations.utils import make_post_request
 from erpnext.stock.utils import get_stock_balance
+from frappe.utils import now
 
 def _sync_single_item_to_api(item, throw_on_error=True):
     """
@@ -204,4 +205,69 @@ def sync_item_on_price_change(doc, method):
         frappe.log_error(
             message=f"Error syncing item {item_code} after price change: {str(e)}",
             title="Item Price Sync Error"
+        )
+
+
+def sync_item_on_deletion(doc, method):
+    """
+    Hook for Item: after_delete.
+    Send deletion notification to external API when item is deleted.
+    """
+    item_code = doc.item_code if hasattr(doc, "item_code") else None
+    if not item_code:
+        return
+
+    # Build deletion payload
+    payload = {
+        "data": {
+            "item_code": item_code,
+            "deleted_at": now()
+        }
+    }
+
+    # Get credentials (same as sync function)
+    bearer_token = frappe.utils.password.get_decrypted_password("Ecommerce Settings", "Ecommerce Settings", "api_token")
+    if not bearer_token:
+        frappe.log_error(
+            message="API token is not set in Ecommerce Settings - cannot sync item deletion",
+            title="Item Deletion Sync Error"
+        )
+        return
+    
+    bearer_token_str = f"Bearer {str(bearer_token)}"
+
+    # Prepare headers with Bearer token
+    headers = {
+        "Authorization": bearer_token_str,
+        "Content-Type": "application/json"
+    }
+
+    # Send POST request to webhook endpoint (same endpoint)
+    website_base_url = frappe.db.get_single_value("Ecommerce Settings", "website_base_url")
+    api_path = "/webhooks/product-sync"
+    if not website_base_url:
+        frappe.log_error(
+            message="Website base URL is not set in Ecommerce Settings - cannot sync item deletion",
+            title="Item Deletion Sync Error"
+        )
+        return
+    
+    webhook_url = f"{website_base_url}{api_path}"
+    
+    try:
+        response = make_post_request(
+            url=webhook_url,
+            headers=headers,
+            json=payload
+        )
+
+        frappe.logger("ecommerce").info(f"Item deletion {item_code} synced successfully to external API")
+        return response
+        
+    except Exception as e:
+        # Log the error but don't block deletion
+        error_message = str(e)
+        frappe.log_error(
+            message=f"Error syncing item deletion {item_code} to external API: {error_message}",
+            title="Item Deletion Sync Error"
         )

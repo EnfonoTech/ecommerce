@@ -140,7 +140,8 @@ app_license = "mit"
 doc_events = {
 	"Item": {
 		"after_insert": "ecommerce.utils.webhook.sync_item_to_external_api",
-		"on_update": "ecommerce.utils.webhook.sync_item_to_external_api"
+		"on_update": "ecommerce.utils.webhook.sync_item_to_external_api",
+		"after_delete": "ecommerce.utils.webhook.sync_item_on_deletion"
 	},
 	"Stock Entry": {
 		"on_submit": "ecommerce.utils.webhook.sync_items_on_material_receipt"

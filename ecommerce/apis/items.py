@@ -107,6 +107,7 @@ def get_composite_item_by_id(id):
 
         result = {
             "bundle_id": combo_item.name,
+            "bundle_category": combo_item.ecom_product_bundle_category,
             "parent_item_id": combo_item.new_item_code
         }
 

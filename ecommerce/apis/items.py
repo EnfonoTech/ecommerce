@@ -1,3 +1,4 @@
+from ecommerce.ecommerce.doctype.bundle_category import bundle_category
 import frappe
 from frappe.utils import getdate
 from erpnext.stock.utils import get_stock_balance
@@ -91,6 +92,37 @@ def get_composite_items(bundle_category):
         frappe.local.response.update({
             bundle_category: result
         })
+
+        return
+    
+    except Exception as e:
+        return str(e)
+    
+@frappe.whitelist()
+def get_composite_item_by_id(id):
+    try:
+        combo_item = frappe.get_doc("Product Bundle", id)
+        
+        components = []
+
+        result = {
+            "bundle_id": combo_item.name,
+            "parent_item_id": combo_item.new_item_code
+        }
+
+        for item in combo_item.items:
+            components.append({
+                "item_id": item.item_code,
+                "item_description": item.description,
+                "quantity": item.qty,
+                "unit": item.uom
+            })
+
+        result.update({
+            "components": components
+        })
+
+        frappe.local.response.update(result)
 
         return
     

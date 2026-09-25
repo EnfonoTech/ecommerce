@@ -2,6 +2,7 @@ from ecommerce.ecommerce.doctype.bundle_category import bundle_category
 import frappe
 from frappe.utils import getdate
 from erpnext.stock.utils import get_stock_balance
+from ecommerce.utils.webhook import _resolve_image_url
 
 @frappe.whitelist()
 def get_most_sold_items(from_date=None, to_date=None, sort_by="quantity", limit=10):
@@ -232,10 +233,16 @@ def get_single_item(item_code):
             "price_list_rate"
         ) or 0
 
-        images_dict = {
-            index: {"is_default": row.get("is_default"), "image_title": row.get("image_title"), "image_url": frappe.utils.get_url(row.get("image"))}
-            for index, row in enumerate(item.get("custom_item_images"))
-        }
+        images_dict = {}
+        for index, row in enumerate(item.get("custom_item_images", [])):
+            image_url = _resolve_image_url(row.get("image"))
+            if not image_url:
+                continue
+            images_dict[index] = {
+                "is_default": row.get("is_default"),
+                "image_title": row.get("image_title"),
+                "image_url": image_url,
+            }
 
         result = {
             "item_code": item.item_code,

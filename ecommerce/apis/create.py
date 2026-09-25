@@ -3,34 +3,106 @@ from frappe.utils import getdate, flt, add_months
 from erpnext import get_default_company
 
 
+def _find_customer_by_contact(phone=None, email=None):
+    """
+    Look up an existing Customer via a linked Contact's phone/email, so a
+    repeat website customer doesn't get a duplicate Customer record just
+    because the caller no longer knows the ERPNext Customer id.
+    """
+    if phone:
+        contact_names = frappe.get_all("Contact Phone", filters={"phone": phone}, pluck="parent")
+        if contact_names:
+            existing = frappe.db.get_value(
+                "Dynamic Link",
+                {"parenttype": "Contact", "link_doctype": "Customer", "parent": ["in", contact_names]},
+                "link_name",
+            )
+            if existing:
+                return existing
+
+    if email:
+        contact_names = frappe.get_all("Contact Email", filters={"email_id": email}, pluck="parent")
+        if contact_names:
+            existing = frappe.db.get_value(
+                "Dynamic Link",
+                {"parenttype": "Contact", "link_doctype": "Customer", "parent": ["in", contact_names]},
+                "link_name",
+            )
+            if existing:
+                return existing
+
+    return None
+
+
+def _get_or_create_customer(customer, customer_details):
+    """
+    Resolve the Customer to use for an incoming website order.
+    `customer` may already be a valid Customer id (repeat order using the
+    id we returned last time), or just an identifier like a phone number
+    that has no matching Customer yet - in which case one is created.
+    """
+    if customer and frappe.db.exists("Customer", customer):
+        return customer
+
+    phone = customer_details.get("phone") or customer
+    email = customer_details.get("email")
+    name = customer_details.get("name") or phone or email
+
+    if not name:
+        frappe.throw("Customer does not exist and no customer_details were provided to create one")
+
+    existing = _find_customer_by_contact(phone=phone, email=email)
+    if existing:
+        return existing
+
+    customer_doc = frappe.get_doc({
+        "doctype": "Customer",
+        "customer_name": name,
+        "customer_type": "Individual",
+        "customer_group": frappe.db.get_single_value("Selling Settings", "customer_group") or "Individual",
+        "territory": frappe.db.get_single_value("Selling Settings", "territory") or "All Territories",
+    })
+    customer_doc.insert(ignore_permissions=True)
+
+    if phone or email:
+        contact = frappe.get_doc({
+            "doctype": "Contact",
+            "first_name": name,
+        })
+        if phone:
+            contact.append("phone_nos", {"phone": phone, "is_primary_mobile_no": 1})
+        if email:
+            contact.append("email_ids", {"email_id": email, "is_primary": 1})
+        contact.append("links", {"link_doctype": "Customer", "link_name": customer_doc.name})
+        contact.insert(ignore_permissions=True)
+
+    return customer_doc.name
+
+
 @frappe.whitelist()
 def sales_order(data=None):
     try:
         # Get data from request if not provided as parameter
         if not data:
             data = frappe.form_dict
-        
+
         data = frappe.parse_json(data)
-        
+
         if not data.get("customer"):
             frappe.throw("Customer is required")
-        
+
         if not data.get("items") or len(data.get("items", [])) == 0:
             frappe.throw("At least one item is required")
-        
+
         # Get default company
         company = get_default_company()
         if not company:
             frappe.throw("Default company is not set. Please set it in Global Defaults.")
-        
-        # Handle customer details - update customer if details provided
-        customer = data.get("customer")
-        customer_details = data.get("customer_details", {})
-        
 
-        if frappe.db.exists("Customer", customer):
-            customer_doc = frappe.get_doc("Customer", customer)
-        
+        # Handle customer details - create the customer if this is their first order
+        customer_details = data.get("customer_details", {}) or {}
+        customer = _get_or_create_customer(data.get("customer"), customer_details)
+
         # Compute delivery date: use provided value, else 1 month from today
         delivery_date = (
             getdate(data.get("delivery_date"))

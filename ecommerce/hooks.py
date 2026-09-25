@@ -251,24 +251,18 @@ doc_events = {
 
 fixtures = [
 			{
-				"dt": "Custom Field", 
+				"dt": "Custom Field",
 				"filters": {
 							"dt": "Sales Order",
-							"fieldname": "custom_email"
+							"fieldname": ["in", ["custom_email", "custom_phone", "custom_wallet_points"]]
 						}
 			},
 			{
-				"dt": "Custom Field", 
-				"filters": {
-							"dt": "Sales Order",
-							"fieldname": "custom_phone"
-						}
+				"dt": "Custom Field",
+				"filters": [["dt", "=", "Item"], ["fieldname", "like", "custom_%"]]
 			},
 			{
-				"dt": "Custom Field", 
-				"filters": {
-							"dt": "Sales Order",
-							"fieldname": "custom_wallet_points"
-						}
+				"dt": "DocType",
+				"filters": [["name", "in", ["Item Image", "Nutritional Highlights", "Product Specifications", "Similar Item"]]]
 			}
 		]

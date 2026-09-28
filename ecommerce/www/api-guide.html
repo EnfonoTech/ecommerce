@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spice Nutrition — ERPNext API Integration Guide</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 15px; line-height: 1.7; color: #1a1a2e; background: #f5f6fa;
+      display: flex; min-height: 100vh;
+    }
+    .sidebar {
+      width: 260px; min-height: 100vh; background: #1a1a2e; color: #c8cfe8;
+      position: fixed; top: 0; left: 0; overflow-y: auto;
+      display: flex; flex-direction: column; z-index: 100;
+    }
+    .sidebar-brand { padding: 24px 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .sidebar-brand .logo-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+    .sidebar-brand .logo-icon {
+      width: 36px; height: 36px; background: linear-gradient(135deg, #2563eb, #7c3aed);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .sidebar-brand .logo-icon svg { width: 20px; height: 20px; stroke: #fff; fill: none; }
+    .sidebar-brand h1 { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
+    .sidebar-brand p { font-size: 11px; color: #6b7299; margin-top: 2px; }
+    .sidebar-nav { padding: 12px 0; flex: 1; }
+    .nav-group-label { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #4a5180; padding: 12px 20px 4px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px; padding: 8px 20px; color: #9ba3c8;
+      text-decoration: none; font-size: 13.5px; border-left: 3px solid transparent; transition: all 0.15s;
+    }
+    .nav-item:hover, .nav-item.active { background: rgba(255,255,255,0.06); color: #fff; border-left-color: #2563eb; }
+    .nav-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; flex-shrink: 0; }
+    .sidebar-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 11px; color: #4a5180; }
+    .sidebar-footer a { color: #6b7299; text-decoration: none; }
+    .main { margin-left: 260px; flex: 1; padding: 0; min-height: 100vh; }
+    .page-header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: #fff; padding: 48px 48px 40px; position: relative; overflow: hidden;
+    }
+    .page-header::after {
+      content: ''; position: absolute; right: -60px; top: -60px; width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(37,99,235,0.3) 0%, transparent 70%); border-radius: 50%;
+    }
+    .page-header .tag {
+      display: inline-block; background: rgba(37,99,235,0.3); border: 1px solid rgba(37,99,235,0.5);
+      color: #93c5fd; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+      padding: 3px 10px; border-radius: 20px; margin-bottom: 12px;
+    }
+    .page-header h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px; }
+    .page-header p { font-size: 15px; color: #93afd4; max-width: 620px; }
+    .page-header .meta { display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap; }
+    .page-header .meta-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #64748b; }
+    .page-header .meta-item svg { width: 14px; height: 14px; stroke: #4a7fb5; fill: none; }
+    .content-body { padding: 40px 48px; max-width: 920px; }
+    .section { margin-bottom: 56px; scroll-margin-top: 24px; }
+    .section-title { display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 800; color: #1a1a2e; margin-bottom: 6px; letter-spacing: -0.3px; }
+    .section-title .icon-wrap { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .section-title .icon-wrap svg { width: 20px; height: 20px; stroke: #fff; fill: none; }
+    .section-subtitle { color: #64748b; font-size: 14px; margin-bottom: 24px; padding-left: 50px; }
+    .steps { position: relative; }
+    .step { display: flex; gap: 20px; margin-bottom: 8px; position: relative; }
+    .step-left { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 36px; }
+    .step-num { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex-shrink: 0; position: relative; z-index: 1; }
+    .step-line { width: 2px; flex: 1; min-height: 20px; background: #e2e8f0; margin-top: 4px; margin-bottom: 4px; }
+    .step:last-child .step-line { display: none; }
+    .step-body { background: #fff; border: 1px solid #e8ecf4; border-radius: 12px; padding: 16px 20px; flex: 1; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .step-body h3 { font-size: 14px; font-weight: 700; color: #1a1a2e; margin-bottom: 8px; }
+    .step-body p { font-size: 13.5px; color: #475569; margin-bottom: 6px; }
+    .step-body ul { padding-left: 18px; } .step-body li { font-size: 13.5px; color: #475569; margin-bottom: 3px; }
+    .step-body li strong { color: #1e293b; }
+    .info-box { border-radius: 10px; padding: 14px 16px; margin: 12px 0; font-size: 13px; display: flex; gap: 10px; align-items: flex-start; }
+    .info-box svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+    .info-box.blue { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; } .info-box.blue svg { stroke: #2563eb; fill: none; }
+    .info-box.green { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; } .info-box.green svg { stroke: #16a34a; fill: none; }
+    .info-box.amber { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; } .info-box.amber svg { stroke: #d97706; fill: none; }
+    .info-box.red { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; } .info-box.red svg { stroke: #dc2626; fill: none; }
+    .field-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 12px 0; }
+    .field-table th { background: #f1f5f9; padding: 8px 12px; text-align: left; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; }
+    .field-table td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+    .field-table tr:last-child td { border-bottom: none; } .field-table tr:hover td { background: #f8fafc; }
+    .field-table .field-name { font-weight: 600; color: #1e293b; }
+    .field-table .field-auto { display: inline-flex; align-items: center; gap: 4px; background: #eff6ff; color: #1d4ed8; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+    .field-table .field-req { display: inline-flex; align-items: center; gap: 4px; background: #fef2f2; color: #dc2626; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+    .badge-grid { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+    .badge { display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+    .badge .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .badge.grey { background: #f1f5f9; color: #475569; } .badge.grey .dot { background: #94a3b8; }
+    .badge.blue { background: #eff6ff; color: #1e40af; } .badge.blue .dot { background: #3b82f6; }
+    .badge.green { background: #f0fdf4; color: #166534; } .badge.green .dot { background: #16a34a; }
+    .badge.red { background: #fef2f2; color: #991b1b; } .badge.red .dot { background: #ef4444; }
+    .nav-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    .nav-table td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; } .nav-table tr:last-child td { border-bottom: none; }
+    .nav-table .path { font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; color: #2563eb; background: #eff6ff; padding: 3px 8px; border-radius: 5px; }
+    .nav-table tr:hover td { background: #f8fafc; }
+    .flow-diagram { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin: 16px 0; }
+    .flow-node { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+    .flow-arrow { font-size: 18px; color: #94a3b8; }
+    .callout { border-left: 4px solid; padding: 14px 18px; border-radius: 0 10px 10px 0; margin: 16px 0; font-size: 13.5px; }
+    .callout.blue { border-color: #3b82f6; background: #eff6ff; color: #1e3a8a; }
+    .callout.red { border-color: #dc2626; background: #fef2f2; color: #7f1d1d; }
+    .callout h4 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 16px 18px; border-radius: 10px; overflow-x: auto; font-size: 12.5px; margin: 12px 0; font-family: "SFMono-Regular", Consolas, monospace; line-height: 1.6; }
+    code { font-family: "SFMono-Regular", Consolas, monospace; background: #f1f5f9; color: #0f172a; font-size: 12.5px; padding: 1px 6px; border-radius: 4px; }
+    pre code { background: none; color: inherit; padding: 0; }
+    .access-box { background: #1a1a2e; border-radius: 12px; padding: 24px; color: #e2e8f0; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+    .access-box .access-item label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #4a5180; margin-bottom: 4px; }
+    .access-box .access-item value { display: block; font-family: "SFMono-Regular", Consolas, monospace; font-size: 14px; color: #93c5fd; word-break: break-all; }
+    .access-box .access-item value.url { color: #34d399; }
+    .divider { border: none; border-top: 1px solid #e8ecf4; margin: 40px 0; }
+    .ic-blue { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+    .ic-purple { background: linear-gradient(135deg, #7c3aed, #4c1d95); }
+    .ic-teal { background: linear-gradient(135deg, #0891b2, #0e7490); }
+    .ic-amber { background: linear-gradient(135deg, #d97706, #92400e); }
+    .ic-rose { background: linear-gradient(135deg, #e11d48, #9f1239); }
+    @media print { .sidebar { display: none; } .main { margin-left: 0; } .page-header { background: #1a1a2e !important; -webkit-print-color-adjust: exact; } }
+    @media (max-width: 768px) {
+      .sidebar { width: 100%; min-height: auto; position: relative; } .main { margin-left: 0; }
+      .content-body { padding: 24px 20px; } .page-header { padding: 32px 24px; } .access-box { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="logo-row">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" stroke-width="1.8"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <h1>Spice Nutrition</h1>
+    </div>
+    <p>ERPNext API Integration Guide</p>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">Getting Started</div>
+    <a href="#access" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Credentials &amp; Access</a>
+    <a href="#flow" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Integration Flow</a>
+
+    <div class="nav-group-label">Endpoints</div>
+    <a href="#item-sync" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.99 6.57 2.64"/><polyline points="21 3 21 9 15 9"/></svg>Item Sync (in)</a>
+    <a href="#sales-order" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>Create Sales Order (out)</a>
+
+    <div class="nav-group-label">Reference</div>
+    <a href="#errors" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Known Issue &amp; Fix</a>
+    <a href="#checklist" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Fix Checklist</a>
+  </nav>
+  <div class="sidebar-footer">
+    ERPNext v15 · ecommerce app<br>
+    Developed by <a href="#">Enfono Technologies</a>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="page-header">
+    <div class="tag">API Integration Guide</div>
+    <h1>Spice Nutrition ⇄ ERPNext</h1>
+    <p>Everything the website backend needs to call ERPNext correctly: credentials, call order, request/response shapes, and the one known bug blocking orders today.</p>
+    <div class="meta">
+      <div class="meta-item"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Sep 2026</div>
+      <div class="meta-item"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>ERPNext v15 · ecommerce app</div>
+    </div>
+  </div>
+
+  <div class="content-body">
+
+    <!-- ACCESS -->
+    <section class="section" id="access">
+      <div class="section-title"><div class="icon-wrap ic-blue"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>Credentials &amp; Access</div>
+      <div class="section-subtitle">Everything needed to authenticate against ERPNext. Rotate the secret if this page is ever shared beyond the integration team.</div>
+
+      <div class="access-box">
+        <div class="access-item"><label>ERPNext Site</label><value class="url">https://spicenutrition.enfonoerp.com</value></div>
+        <div class="access-item"><label>Integration User</label><value>spicenutritionpvtltd@gmail.com</value></div>
+        <div class="access-item"><label>API Key</label><value>8bb68844e36bc72</value></div>
+        <div class="access-item"><label>API Secret</label><value>d82ed035292e259</value></div>
+      </div>
+
+      <div class="callout blue">
+        <h4>Auth header (the "token" used on every call)</h4>
+        <pre><code>Authorization: token 8bb68844e36bc72:d82ed035292e259
+Content-Type: application/json</code></pre>
+        This is a Frappe API key:secret pair, not a session cookie or OAuth token. Send it on every request below.
+      </div>
+
+      <div class="info-box amber">
+        <svg viewBox="0 0 24 24" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        This page is public (no login) so it's easy to share with the integration team. That also means this secret is exposed to anyone with the link — treat the link itself as sensitive, and ask Enfono to rotate the secret once integration is stable.
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <!-- FLOW -->
+    <section class="section" id="flow">
+      <div class="section-title"><div class="icon-wrap ic-purple"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>Integration Flow — Call Order</div>
+      <div class="section-subtitle">Only ONE call direction needs the website to act as a client. The other direction, ERPNext calls the website.</div>
+
+      <div class="flow-diagram">
+        <div class="flow-node badge blue"><span class="dot"></span>ERPNext: Item saved</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node badge green"><span class="dot"></span>Website: /webhooks/product-sync (you receive)</div>
+      </div>
+      <div class="flow-diagram">
+        <div class="flow-node badge blue"><span class="dot"></span>Website: checkout paid</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node badge green"><span class="dot"></span>ERPNext: sales_order (you call)</div>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:#eff6ff;color:#1d4ed8;">1</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <h3>Item catalog — nothing to call, you receive it</h3>
+            <p>ERPNext pushes item creates/updates/deletes/price/stock changes to your <code>/webhooks/product-sync</code> endpoint automatically, whenever staff edits an Item in ERPNext. You don't poll or request anything for this — just implement the receiver (already working on your side).</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:#eff6ff;color:#1d4ed8;">2</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <h3>Customer completes checkout on the website</h3>
+            <p>The moment payment succeeds (or the order is otherwise confirmed), your backend calls ERPNext's <code>sales_order</code> endpoint — see below.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:#eff6ff;color:#1d4ed8;">3</div></div>
+          <div class="step-body">
+            <h3>ERPNext creates/reuses the Customer, creates a draft Sales Order</h3>
+            <p>You get back the Sales Order name + totals in the response. Store <code>sales_order.name</code> against your own order record if you want a reference.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <!-- ITEM SYNC -->
+    <section class="section" id="item-sync">
+      <div class="section-title"><div class="icon-wrap ic-teal"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.99 6.57 2.64"/><polyline points="21 3 21 9 15 9"/></svg></div>Item Sync — ERPNext calls you</div>
+      <div class="section-subtitle">You implement this receiver. ERPNext sends every item change here.</div>
+
+      <table class="nav-table">
+        <tbody>
+          <tr><td><strong>Method</strong></td><td><span class="path">POST</span></td></tr>
+          <tr><td><strong>Your endpoint</strong></td><td><span class="path">https://spicenutrition.ecomtemplatehub.com/webhooks/product-sync</span></td></tr>
+          <tr><td><strong>Auth header sent to you</strong></td><td><span class="path">Authorization: Bearer &lt;api_token&gt;</span></td></tr>
+          <tr><td><strong>Fires on</strong></td><td>Item create / update / delete, Item Price change, Stock Entry (Material Receipt)</td></tr>
+        </tbody>
+      </table>
+
+      <p style="font-size:13.5px;color:#475569;margin-top:16px;font-weight:700;">Example payload ERPNext sends you</p>
+      <pre><code>{
+  "data": {
+    "item_code": "EX-P-0006",
+    "item_name": "EXALT WHEY PROTEIN - 5 LBS/CHOCOLATE",
+    "brand_name": "Exalt",
+    "category_name": "Protein",
+    "disabled": 0,
+    "available_stock": 42,
+    "selling_prrice": 5799.0,
+    "images": [
+      {"is_default": true, "image_title": "main", "image": "https://i.ibb.co/.../main.jpg"}
+    ]
+  }
+}</code></pre>
+
+      <div class="info-box green">
+        <svg viewBox="0 0 24 24" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg>
+        Verified working live (Sept 2026) — real item synced, your endpoint responded <code>{"success": true, "message": "Product updated successfully", "product_id": ..., "slug": ...}</code>.
+      </div>
+
+      <div class="info-box amber">
+        <svg viewBox="0 0 24 24" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        This is one-directional: ERPNext → you. There is no endpoint for pushing item/image edits from the website back into ERPNext — items are managed in ERPNext only.
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <!-- SALES ORDER -->
+    <section class="section" id="sales-order">
+      <div class="section-title"><div class="icon-wrap ic-amber"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div>Create Sales Order — you call ERPNext</div>
+      <div class="section-subtitle">Call this on checkout completion. This is the endpoint currently mis-called (see Known Issue below).</div>
+
+      <table class="nav-table">
+        <tbody>
+          <tr><td><strong>Method</strong></td><td><span class="path">POST</span></td></tr>
+          <tr><td><strong>URL</strong></td><td><span class="path">https://spicenutrition.enfonoerp.com/api/method/ecommerce.apis.create.sales_order</span></td></tr>
+          <tr><td><strong>Headers</strong></td><td><span class="path">Authorization: token 8bb68844e36bc72:d82ed035292e259</span> + <span class="path">Content-Type: application/json</span></td></tr>
+        </tbody>
+      </table>
+
+      <p style="font-size:13.5px;color:#475569;margin-top:16px;font-weight:700;">Request body</p>
+      <pre><code>{
+  "customer": "9044120147",
+  "customer_details": {
+    "name": "John Doe",
+    "phone": "9044120147",
+    "email": "john@example.com"
+  },
+  "items": [
+    { "item_code": "SD-PR-1000", "qty": 1, "rate": 3499 }
+  ],
+  "order_ref": "your-internal-order-id",
+  "delivery_date": "2026-10-05",
+  "discount_amount": 0,
+  "wallet_points": 0
+}</code></pre>
+
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Description</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td class="field-name">customer</td><td>Any stable identifier — the customer's phone number is fine, doesn't need to exist in ERPNext yet</td><td><span class="field-req">Required</span></td></tr>
+          <tr><td class="field-name">customer_details</td><td>name / phone / email — used to auto-create the Customer on first order, and to find the same Customer again on repeat orders</td><td><span class="field-req">Required</span></td></tr>
+          <tr><td class="field-name">items[].item_code</td><td>Must match ERPNext's item_code exactly (same codes the product-sync payload uses)</td><td><span class="field-req">Required</span></td></tr>
+          <tr><td class="field-name">delivery_date</td><td>Defaults to 1 month out if omitted</td><td></td></tr>
+          <tr><td class="field-name">order_ref</td><td>Your own order id, stored on the Sales Order as <code>po_no</code> for cross-reference</td><td></td></tr>
+        </tbody>
+      </table>
+
+      <p style="font-size:13.5px;color:#475569;margin-top:16px;font-weight:700;">Success response (200)</p>
+      <pre><code>{
+  "status": "success",
+  "message": "Sales Order created successfully",
+  "sales_order": {
+    "name": "SAL-ORD-2026-00042",
+    "customer": "John Doe",
+    "grand_total": 3499,
+    "net_total": 3499,
+    "docstatus": 0
+  }
+}</code></pre>
+
+      <div class="info-box green">
+        <svg viewBox="0 0 24 24" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg>
+        Verified working live (Sept 2026): auto-creates the Customer on first order, reuses the same Customer by phone/email on repeat orders. Confirmed with a real test Sales Order (deleted after testing).
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <!-- KNOWN ISSUE -->
+    <section class="section" id="errors">
+      <div class="section-title"><div class="icon-wrap ic-rose"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>Known Issue — Blocking All Orders Right Now</div>
+      <div class="section-subtitle">Confirmed from ERPNext's own nginx access logs.</div>
+
+      <div class="callout red">
+        <h4>Wrong URL — missing a slash</h4>
+        Your checkout backend is calling <code>/apimethod/ecommerce.apis.create.sales_order</code> instead of <code>/api/method/ecommerce.apis.create.sales_order</code>. Every call 404s before it ever reaches ERPNext's code.
+      </div>
+
+      <pre><code>149.255.58.156 - - [25/Sep/2026:08:37:40] "POST /apimethod/ecommerce.apis.create.sales_order" 404
+106.222.237.121 - - [24/Sep/2026:09:35:50] "POST /apimethod/ecommerce.apis.create.sales_order" 404
+149.255.58.156 - - [23/Sep/2026:07:30:34] "POST /apimethod/ecommerce.apis.create.sales_order" 404
+... 23 attempts total over 14 days, all identical 404, all the wrong path
+... zero calls ever recorded to the correct /api/method/ path</code></pre>
+
+      <div class="info-box red">
+        <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        Every real customer who has checked out in this window got no Sales Order in ERPNext. One-line fix on the website side.
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <!-- CHECKLIST -->
+    <section class="section" id="checklist">
+      <div class="section-title"><div class="icon-wrap ic-blue"><svg viewBox="0 0 24 24" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>Fix Checklist</div>
+      <div class="section-subtitle">Apply these in order.</div>
+
+      <div class="badge-grid" style="flex-direction:column;align-items:flex-start;">
+        <div class="badge grey"><span class="dot"></span>Change <code>/apimethod/</code> → <code>/api/method/</code> in the checkout order-creation call</div>
+        <div class="badge grey"><span class="dot"></span>Set the <code>Authorization: token &lt;key&gt;:&lt;secret&gt;</code> header exactly as shown above</div>
+        <div class="badge grey"><span class="dot"></span>Place one real test order and confirm a Sales Order appears in ERPNext (ask Enfono to check with you)</div>
+        <div class="badge grey"><span class="dot"></span>Re-check customers who tried to order in the last 2+ weeks — their orders never reached ERPNext</div>
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <div style="text-align:center;color:#94a3b8;font-size:12px;padding-bottom:48px;">
+      <p>Spice Nutrition · ERPNext API Integration Guide · Developed by <strong style="color:#64748b;">Enfono Technologies</strong></p>
+      <p style="margin-top:4px;">ERPNext v15 · ecommerce app · Sept 2026</p>
+    </div>
+
+  </div>
+</main>
+
+<script>
+  const sections = document.querySelectorAll('section[id]');
+  const navItems = document.querySelectorAll('.nav-item');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        navItems.forEach(n => n.classList.remove('active'));
+        const active = document.querySelector(`.nav-item[href="#${e.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

@@ -142,7 +142,8 @@
 
     <div class="nav-group-label">Endpoints</div>
     <a href="#item-sync" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.99 6.57 2.64"/><polyline points="21 3 21 9 15 9"/></svg>Item Sync (in)</a>
-    <a href="#sales-order" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>Create Sales Order (out)</a>
+    <a href="#sales-invoice" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>Create Sales Invoice (out)</a>
+    <a href="#credit-note" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><polyline points="3 3 3 8 8 8"/></svg>Create Credit Note (out)</a>
 
     <div class="nav-group-label">Reference</div>
     <a href="#errors" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Known Issue &amp; Fix</a>
@@ -207,7 +208,17 @@ Content-Type: application/json</code></pre>
       <div class="flow-diagram">
         <div class="flow-node badge blue"><span class="dot"></span>Website: checkout paid</div>
         <div class="flow-arrow">→</div>
-        <div class="flow-node badge green"><span class="dot"></span>ERPNext: sales_order (you call)</div>
+        <div class="flow-node badge green"><span class="dot"></span>ERPNext: create_sales_invoice (you call)</div>
+      </div>
+      <div class="flow-diagram">
+        <div class="flow-node badge blue"><span class="dot"></span>Website: return / cancellation</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node badge green"><span class="dot"></span>ERPNext: create_credit_note (you call)</div>
+      </div>
+      <div class="flow-diagram">
+        <div class="flow-node badge blue"><span class="dot"></span>ERPNext: invoice/credit note submitted</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node badge green"><span class="dot"></span>Website: /webhooks/product-sync (stock update, you receive)</div>
       </div>
 
       <div class="steps">
@@ -222,14 +233,21 @@ Content-Type: application/json</code></pre>
           <div class="step-left"><div class="step-num" style="background:#eff6ff;color:#1d4ed8;">2</div><div class="step-line"></div></div>
           <div class="step-body">
             <h3>Customer completes checkout on the website</h3>
-            <p>The moment payment succeeds (or the order is otherwise confirmed), your backend calls ERPNext's <code>sales_order</code> endpoint — see below.</p>
+            <p>The moment payment succeeds (or the order is otherwise confirmed), your backend calls ERPNext's <code>create_sales_invoice</code> endpoint — see below.</p>
           </div>
         </div>
         <div class="step">
-          <div class="step-left"><div class="step-num" style="background:#eff6ff;color:#1d4ed8;">3</div></div>
+          <div class="step-left"><div class="step-num" style="background:#eff6ff;color:#1d4ed8;">3</div><div class="step-line"></div></div>
           <div class="step-body">
-            <h3>ERPNext creates/reuses the Customer, creates a draft Sales Order</h3>
-            <p>You get back the Sales Order name + totals in the response. Store <code>sales_order.name</code> against your own order record if you want a reference.</p>
+            <h3>ERPNext creates/reuses the Customer, creates and SUBMITS a Sales Invoice</h3>
+            <p>Unlike a Sales Order, the invoice is submitted immediately with <code>update_stock=1</code> — stock deducts in the same call, and the item's new stock figure is pushed to your <code>/webhooks/product-sync</code> receiver right after, in real time.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:#eff6ff;color:#1d4ed8;">4</div></div>
+          <div class="step-body">
+            <h3>Customer returns an item, or the order is cancelled</h3>
+            <p>Call <code>create_credit_note</code> with the original invoice name. Stock and accounting reverse automatically; the reversed stock is pushed to you the same way.</p>
           </div>
         </div>
       </div>
@@ -280,15 +298,15 @@ Content-Type: application/json</code></pre>
 
     <hr class="divider" />
 
-    <!-- SALES ORDER -->
-    <section class="section" id="sales-order">
-      <div class="section-title"><div class="icon-wrap ic-amber"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div>Create Sales Order — you call ERPNext</div>
-      <div class="section-subtitle">Call this on checkout completion. This is the endpoint currently mis-called (see Known Issue below).</div>
+    <!-- SALES INVOICE -->
+    <section class="section" id="sales-invoice">
+      <div class="section-title"><div class="icon-wrap ic-amber"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div>Create Sales Invoice — you call ERPNext</div>
+      <div class="section-subtitle">Call this on checkout completion. Per the BRD, this creates and SUBMITS an invoice (not a draft Sales Order) with automatic stock deduction.</div>
 
       <table class="nav-table">
         <tbody>
           <tr><td><strong>Method</strong></td><td><span class="path">POST</span></td></tr>
-          <tr><td><strong>URL</strong></td><td><span class="path">https://spicenutrition.enfonoerp.com/api/method/ecommerce.apis.create.sales_order</span></td></tr>
+          <tr><td><strong>URL</strong></td><td><span class="path">https://spicenutrition.enfonoerp.com/api/method/ecommerce.apis.create.create_sales_invoice</span></td></tr>
           <tr><td><strong>Headers</strong></td><td><span class="path">Authorization: token 8bb68844e36bc72:d82ed035292e259</span> + <span class="path">Content-Type: application/json</span></td></tr>
         </tbody>
       </table>
@@ -305,7 +323,6 @@ Content-Type: application/json</code></pre>
     { "item_code": "SD-PR-1000", "qty": 1, "rate": 3499 }
   ],
   "order_ref": "your-internal-order-id",
-  "delivery_date": "2026-10-05",
   "discount_amount": 0,
   "wallet_points": 0
 }</code></pre>
@@ -316,27 +333,91 @@ Content-Type: application/json</code></pre>
           <tr><td class="field-name">customer</td><td>Any stable identifier — the customer's phone number is fine, doesn't need to exist in ERPNext yet</td><td><span class="field-req">Required</span></td></tr>
           <tr><td class="field-name">customer_details</td><td>name / phone / email — used to auto-create the Customer on first order, and to find the same Customer again on repeat orders</td><td><span class="field-req">Required</span></td></tr>
           <tr><td class="field-name">items[].item_code</td><td>Must match ERPNext's item_code exactly (same codes the product-sync payload uses)</td><td><span class="field-req">Required</span></td></tr>
-          <tr><td class="field-name">delivery_date</td><td>Defaults to 1 month out if omitted</td><td></td></tr>
-          <tr><td class="field-name">order_ref</td><td>Your own order id, stored on the Sales Order as <code>po_no</code> for cross-reference</td><td></td></tr>
+          <tr><td class="field-name">order_ref</td><td>Your own order id, stored on the invoice as <code>po_no</code> for cross-reference</td><td></td></tr>
         </tbody>
       </table>
 
       <p style="font-size:13.5px;color:#475569;margin-top:16px;font-weight:700;">Success response (200)</p>
       <pre><code>{
   "status": "success",
-  "message": "Sales Order created successfully",
-  "sales_order": {
-    "name": "SAL-ORD-2026-00042",
+  "message": "Sales Invoice created and submitted successfully",
+  "sales_invoice": {
+    "name": "SINV-26-00042",
     "customer": "John Doe",
     "grand_total": 3499,
     "net_total": 3499,
-    "docstatus": 0
+    "outstanding_amount": 3499,
+    "update_stock": 1,
+    "docstatus": 1
   }
 }</code></pre>
 
       <div class="info-box green">
         <svg viewBox="0 0 24 24" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg>
-        Verified working live (Sept 2026): auto-creates the Customer on first order, reuses the same Customer by phone/email on repeat orders. Confirmed with a real test Sales Order (deleted after testing).
+        Verified working live (Sept 2026): submitted invoice, stock deducted by exactly the ordered qty (checked against the item's Bin quantity before/after), auto-creates the Customer on first order and reuses it by phone/email on repeat orders.
+      </div>
+
+      <div class="info-box amber">
+        <svg viewBox="0 0 24 24" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span><code>docstatus: 1</code> means the invoice is final the moment this call returns — there's no separate "confirm" step, no accept/reject workflow. If an order needs a review step before it's binding, hold the call until that review passes; don't call this speculatively.</span>
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <!-- CREDIT NOTE -->
+    <section class="section" id="credit-note">
+      <div class="section-title"><div class="icon-wrap ic-rose"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><polyline points="3 3 3 8 8 8"/></svg></div>Create Credit Note — you call ERPNext</div>
+      <div class="section-subtitle">Call this for a return or cancellation of an already-submitted Sales Invoice. Reverses stock and accounting automatically.</div>
+
+      <table class="nav-table">
+        <tbody>
+          <tr><td><strong>Method</strong></td><td><span class="path">POST</span></td></tr>
+          <tr><td><strong>URL</strong></td><td><span class="path">https://spicenutrition.enfonoerp.com/api/method/ecommerce.apis.create.create_credit_note</span></td></tr>
+          <tr><td><strong>Headers</strong></td><td>Same auth header as above</td></tr>
+        </tbody>
+      </table>
+
+      <p style="font-size:13.5px;color:#475569;margin-top:16px;font-weight:700;">Request body — full return (everything on the invoice)</p>
+      <pre><code>{
+  "invoice": "SINV-26-00042",
+  "reason": "Customer returned the item"
+}</code></pre>
+
+      <p style="font-size:13.5px;color:#475569;margin-top:16px;font-weight:700;">Request body — partial return (only some items/qty)</p>
+      <pre><code>{
+  "invoice": "SINV-26-00042",
+  "items": [
+    { "item_code": "SD-PR-1000", "qty": 1 }
+  ],
+  "reason": "1 of 2 units damaged in transit"
+}</code></pre>
+
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Description</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td class="field-name">invoice</td><td>The Sales Invoice name returned by create_sales_invoice</td><td><span class="field-req">Required</span></td></tr>
+          <tr><td class="field-name">items</td><td>Omit for a full return of every item on the invoice; pass a subset with qty for a partial return</td><td></td></tr>
+          <tr><td class="field-name">reason</td><td>Free text, stored on the credit note's Remarks</td><td></td></tr>
+        </tbody>
+      </table>
+
+      <p style="font-size:13.5px;color:#475569;margin-top:16px;font-weight:700;">Success response (200)</p>
+      <pre><code>{
+  "status": "success",
+  "message": "Credit note created and submitted successfully",
+  "credit_note": {
+    "name": "SINV-26-00043",
+    "return_against": "SINV-26-00042",
+    "grand_total": -3499,
+    "update_stock": 1,
+    "docstatus": 1
+  }
+}</code></pre>
+
+      <div class="info-box green">
+        <svg viewBox="0 0 24 24" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg>
+        Verified working live (Sept 2026): full return tested against a real invoice — stock returned to exactly its pre-sale quantity, invoice correctly linked via <code>return_against</code>.
       </div>
     </section>
 
@@ -345,11 +426,11 @@ Content-Type: application/json</code></pre>
     <!-- KNOWN ISSUE -->
     <section class="section" id="errors">
       <div class="section-title"><div class="icon-wrap ic-rose"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>Known Issue — Blocking All Orders Right Now</div>
-      <div class="section-subtitle">Confirmed from ERPNext's own nginx access logs.</div>
+      <div class="section-subtitle">Confirmed from ERPNext's own nginx access logs, plus one more thing that changed since.</div>
 
       <div class="callout red">
-        <h4>Wrong URL — missing a slash</h4>
-        Your checkout backend is calling <code>/apimethod/ecommerce.apis.create.sales_order</code> instead of <code>/api/method/ecommerce.apis.create.sales_order</code>. Every call 404s before it ever reaches ERPNext's code.
+        <h4>1. Wrong URL — missing a slash</h4>
+        Your checkout backend is calling <code>/apimethod/...</code> instead of <code>/api/method/...</code>. Every call 404s before it ever reaches ERPNext's code.
       </div>
 
       <pre><code>149.255.58.156 - - [25/Sep/2026:08:37:40] "POST /apimethod/ecommerce.apis.create.sales_order" 404
@@ -358,9 +439,14 @@ Content-Type: application/json</code></pre>
 ... 23 attempts total over 14 days, all identical 404, all the wrong path
 ... zero calls ever recorded to the correct /api/method/ path</code></pre>
 
+      <div class="callout red">
+        <h4>2. The method itself was renamed (Sept 29, 2026)</h4>
+        The log lines above target <code>ecommerce.apis.create.sales_order</code> — that endpoint has been removed. The BRD calls for Sales Invoices with automatic stock deduction and credit-note returns, which a Sales Order can't do, so it's been replaced with <code>create_sales_invoice</code> and a new <code>create_credit_note</code>. Fixing only the slash and pointing at the old name will still 404. Use the URLs in the sections above.
+      </div>
+
       <div class="info-box red">
         <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-        Every real customer who has checked out in this window got no Sales Order in ERPNext. One-line fix on the website side.
+        Every real customer who has checked out in this window got no order record in ERPNext at all. Two fixes needed on the website side, not one.
       </div>
     </section>
 
@@ -373,8 +459,10 @@ Content-Type: application/json</code></pre>
 
       <div class="badge-grid" style="flex-direction:column;align-items:flex-start;">
         <div class="badge grey"><span class="dot"></span>Change <code>/apimethod/</code> → <code>/api/method/</code> in the checkout order-creation call</div>
+        <div class="badge grey"><span class="dot"></span>Point that call at <code>ecommerce.apis.create.create_sales_invoice</code> (not <code>sales_order</code> — that method no longer exists)</div>
         <div class="badge grey"><span class="dot"></span>Set the <code>Authorization: token &lt;key&gt;:&lt;secret&gt;</code> header exactly as shown above</div>
-        <div class="badge grey"><span class="dot"></span>Place one real test order and confirm a Sales Order appears in ERPNext (ask Enfono to check with you)</div>
+        <div class="badge grey"><span class="dot"></span>Wire up <code>create_credit_note</code> for your returns/cancellation flow</div>
+        <div class="badge grey"><span class="dot"></span>Place one real test order and confirm a submitted Sales Invoice appears in ERPNext with stock deducted (ask Enfono to check with you)</div>
         <div class="badge grey"><span class="dot"></span>Re-check customers who tried to order in the last 2+ weeks — their orders never reached ERPNext</div>
       </div>
     </section>

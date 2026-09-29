@@ -149,6 +149,10 @@ doc_events = {
 	"Item Price": {
 		"after_insert": "ecommerce.utils.webhook.sync_item_on_price_change",
 		"on_update": "ecommerce.utils.webhook.sync_item_on_price_change"
+	},
+	"Sales Invoice": {
+		"on_submit": "ecommerce.utils.webhook.sync_items_on_invoice_stock_change",
+		"on_cancel": "ecommerce.utils.webhook.sync_items_on_invoice_stock_change"
 	}
 }
 
@@ -254,6 +258,13 @@ fixtures = [
 				"dt": "Custom Field",
 				"filters": {
 							"dt": "Sales Order",
+							"fieldname": ["in", ["custom_email", "custom_phone", "custom_wallet_points"]]
+						}
+			},
+			{
+				"dt": "Custom Field",
+				"filters": {
+							"dt": "Sales Invoice",
 							"fieldname": ["in", ["custom_email", "custom_phone", "custom_wallet_points"]]
 						}
 			},

@@ -1,7 +1,7 @@
 import frappe
 from frappe.integrations.utils import make_post_request
 from erpnext.stock.utils import get_stock_balance
-from frappe.utils import now
+from frappe.utils import now, cint
 
 
 def _resolve_image_url(raw_image):
@@ -186,6 +186,22 @@ def sync_item_on_price_change(doc, method):
     if not item_code:
         return
     _enqueue_item_sync(item_code)
+
+
+def sync_items_on_invoice_stock_change(doc, method):
+    """
+    Hook for Sales Invoice: on_submit, on_cancel.
+    An e-commerce order (create_sales_invoice) and its credit note both
+    submit with update_stock=1, so every submit/cancel here is a real stock
+    movement - queue a sync for each item so the website's stock figure
+    reflects it in real time, not just on the next unrelated Item edit.
+    """
+    if not cint(doc.get("update_stock")):
+        return
+
+    item_codes = {row.item_code for row in doc.get("items", []) if row.item_code}
+    for item_code in item_codes:
+        _enqueue_item_sync(item_code)
 
 
 def _sync_item_deletion_job(item_code):

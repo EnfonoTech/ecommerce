@@ -1,6 +1,8 @@
 import frappe
-from frappe.utils import getdate, flt, add_months
+from frappe import _
+from frappe.utils import getdate, flt
 from erpnext import get_default_company
+from erpnext.accounts.doctype.sales_invoice.sales_invoice import make_sales_return
 
 
 def _find_customer_by_contact(phone=None, email=None):
@@ -49,7 +51,7 @@ def _get_or_create_customer(customer, customer_details):
     name = customer_details.get("name") or phone or email
 
     if not name:
-        frappe.throw("Customer does not exist and no customer_details were provided to create one")
+        frappe.throw(_("Customer does not exist and no customer_details were provided to create one"))
 
     existing = _find_customer_by_contact(phone=phone, email=email)
     if existing:
@@ -79,100 +81,197 @@ def _get_or_create_customer(customer, customer_details):
     return customer_doc.name
 
 
+def _get_default_warehouse(item_code, company):
+    """
+    Resolve the warehouse to deduct stock from for this item: the item's own
+    company-specific default first, falling back to Stock Settings.
+    update_stock on a Sales Invoice requires every stock item row to carry
+    a warehouse, or submit throws (validate_warehouse in selling_controller).
+    """
+    warehouse = frappe.db.get_value(
+        "Item Default", {"parent": item_code, "company": company}, "default_warehouse"
+    )
+    if not warehouse:
+        warehouse = frappe.db.get_single_value("Stock Settings", "default_warehouse")
+    if not warehouse:
+        msg = _("No default warehouse configured for item {0}. Set one under the item's Item Defaults or in Stock Settings.")
+        frappe.throw(msg.format(item_code))
+    return warehouse
+
+
 @frappe.whitelist()
-def sales_order(data=None):
+def create_sales_invoice(data=None):
+    """
+    Auto-create (and submit) a Sales Invoice from a website order, with
+    update_stock=1 so stock deducts automatically on submit - per the BRD's
+    e-commerce integration requirement. Returns the submitted invoice.
+    """
     try:
-        # Get data from request if not provided as parameter
         if not data:
             data = frappe.form_dict
 
         data = frappe.parse_json(data)
 
         if not data.get("customer"):
-            frappe.throw("Customer is required")
+            frappe.throw(_("Customer is required"))
 
         if not data.get("items") or len(data.get("items", [])) == 0:
-            frappe.throw("At least one item is required")
+            frappe.throw(_("At least one item is required"))
 
-        # Get default company
         company = get_default_company()
         if not company:
-            frappe.throw("Default company is not set. Please set it in Global Defaults.")
+            frappe.throw(_("Default company is not set. Please set it in Global Defaults."))
 
-        # Handle customer details - create the customer if this is their first order
         customer_details = data.get("customer_details", {}) or {}
         customer = _get_or_create_customer(data.get("customer"), customer_details)
 
-        # Compute delivery date: use provided value, else 1 month from today
-        delivery_date = (
-            getdate(data.get("delivery_date"))
-            if data.get("delivery_date")
-            else add_months(getdate(), 1)
-        )
-
-        # Create Sales Order
-        sales_order = frappe.get_doc({
-            "doctype": "Sales Order",
+        sales_invoice = frappe.get_doc({
+            "doctype": "Sales Invoice",
             "customer": customer,
             "customer_name": customer_details.get("name"),
             "custom_email": customer_details.get("email"),
             "custom_phone": customer_details.get("phone"),
-            "transaction_date": getdate(data.get("transaction_date")) if data.get("transaction_date") else getdate(),
-            "delivery_date": delivery_date,
+            "posting_date": getdate(data.get("transaction_date")) if data.get("transaction_date") else getdate(),
             "company": company,
-            "order_type": "Sales",
-            "po_no": data.get("order_ref", ""),  # Customer's Purchase Order
+            "po_no": data.get("order_ref", ""),  # Customer's website order id
+            "update_stock": 1,
         })
-        
-        # Add items
+
+        common_warehouse = None
         for item_data in data.get("items", []):
             item_code = item_data.get("item_code")
             qty = flt(item_data.get("qty", 0))
             rate = flt(item_data.get("rate", 0))
-            
+
             if not item_code:
-                frappe.throw("Item code is required for all items")
-            
-            # Check if item exists
-            if not frappe.db.exists("Item", item_code):
-                frappe.throw(f"Item {item_code} does not exist")
-            
-            sales_order.append("items", {
-                "item_code": item_code,
-                "qty": qty,
-                "rate": rate
-            })
-        
-        sales_order.set_missing_values()
+                frappe.throw(_("Item code is required for all items"))
+
+            item_meta = frappe.db.get_value("Item", item_code, ["name", "is_stock_item"], as_dict=True)
+            if not item_meta:
+                not_exist_msg = _("Item {0} does not exist")
+                frappe.throw(not_exist_msg.format(item_code))
+
+            row = {"item_code": item_code, "qty": qty, "rate": rate}
+            if item_meta.is_stock_item:
+                warehouse = _get_default_warehouse(item_code, company)
+                common_warehouse = common_warehouse or warehouse
+                row["warehouse"] = warehouse
+
+            sales_invoice.append("items", row)
+
+        sales_invoice.set_warehouse = common_warehouse
+        sales_invoice.set_missing_values()
 
         if data.get("discount_amount"):
-            sales_order.discount_amount = flt(data.get("discount_amount", 0))
-            sales_order.apply_discount_on = "Grand Total"
-            sales_order.custom_wallet_points = flt(data.get("wallet_points", 0))
-        
-        # Insert the document (draft status - docstatus = 0)
-        sales_order.insert(ignore_permissions=True)
-        
-        # Return the created sales order
+            sales_invoice.discount_amount = flt(data.get("discount_amount", 0))
+            sales_invoice.apply_discount_on = "Grand Total"
+            sales_invoice.custom_wallet_points = flt(data.get("wallet_points", 0))
+
+        sales_invoice.insert(ignore_permissions=True)
+        sales_invoice.submit()
+
         return {
             "status": "success",
-            "message": "Sales Order created successfully",
-            "sales_order": {
-                "name": sales_order.name,
-                "customer": sales_order.customer,
-                "transaction_date": str(sales_order.transaction_date),
-                "delivery_date": str(sales_order.delivery_date) if sales_order.delivery_date else None,
-                "grand_total": sales_order.grand_total,
-                "net_total": sales_order.net_total,
-                "discount_amount": sales_order.discount_amount,
-                "status": sales_order.status,
-                "docstatus": sales_order.docstatus  # Should be 0 for draft
+            "message": "Sales Invoice created and submitted successfully",
+            "sales_invoice": {
+                "name": sales_invoice.name,
+                "customer": sales_invoice.customer,
+                "posting_date": str(sales_invoice.posting_date),
+                "grand_total": sales_invoice.grand_total,
+                "net_total": sales_invoice.net_total,
+                "outstanding_amount": sales_invoice.outstanding_amount,
+                "discount_amount": sales_invoice.discount_amount,
+                "update_stock": sales_invoice.update_stock,
+                "docstatus": sales_invoice.docstatus,  # 1 = submitted, stock + GL posted
             }
         }
-        
+
     except Exception as e:
+        error_detail = str(e)
         frappe.log_error(
-            message=f"Error creating Sales Order: {str(e)}",
-            title="Sales Order Creation Error"
+            message="Error creating Sales Invoice: " + error_detail,
+            title="Sales Invoice Creation Error"
         )
-        frappe.throw(f"Failed to create Sales Order: {str(e)}")
+        fail_msg = _("Failed to create Sales Invoice: {0}")
+        frappe.throw(fail_msg.format(error_detail))
+
+
+@frappe.whitelist()
+def create_credit_note(data=None):
+    """
+    Reverse a submitted Sales Invoice for a return or cancellation, by
+    creating and submitting a credit note (a return Sales Invoice,
+    is_return=1) against it. update_stock reverses automatically since the
+    return mirrors the original invoice's update_stock setting.
+
+    `items` is optional: omit it for a full return of everything on the
+    original invoice, or pass a subset with qty to return only part of it.
+    """
+    try:
+        if not data:
+            data = frappe.form_dict
+        data = frappe.parse_json(data)
+
+        invoice_name = data.get("invoice")
+        if not invoice_name:
+            frappe.throw(_("Sales Invoice name (invoice) is required"))
+
+        if not frappe.db.exists("Sales Invoice", invoice_name):
+            not_exist_msg = _("Sales Invoice {0} does not exist")
+            frappe.throw(not_exist_msg.format(invoice_name))
+
+        source = frappe.get_doc("Sales Invoice", invoice_name)
+        if source.docstatus != 1:
+            not_submitted_msg = _("Sales Invoice {0} is not submitted, nothing to reverse")
+            frappe.throw(not_submitted_msg.format(invoice_name))
+        if source.is_return:
+            already_return_msg = _("Sales Invoice {0} is already a credit note")
+            frappe.throw(already_return_msg.format(invoice_name))
+
+        credit_note = make_sales_return(invoice_name)
+
+        requested_items = data.get("items")
+        if requested_items:
+            requested_qty = {
+                i["item_code"]: flt(i.get("qty"))
+                for i in requested_items
+                if i.get("item_code")
+            }
+            kept_rows = []
+            for row in credit_note.items:
+                if row.item_code in requested_qty:
+                    row.qty = -abs(requested_qty[row.item_code])
+                    kept_rows.append(row)
+            if not kept_rows:
+                no_match_msg = _("None of the requested items match Sales Invoice {0}")
+                frappe.throw(no_match_msg.format(invoice_name))
+            credit_note.items = kept_rows
+            credit_note.set_missing_values()
+
+        if data.get("reason"):
+            credit_note.remarks = data.get("reason")
+
+        credit_note.insert(ignore_permissions=True)
+        credit_note.submit()
+
+        return {
+            "status": "success",
+            "message": "Credit note created and submitted successfully",
+            "credit_note": {
+                "name": credit_note.name,
+                "return_against": credit_note.return_against,
+                "grand_total": credit_note.grand_total,
+                "update_stock": credit_note.update_stock,
+                "docstatus": credit_note.docstatus,
+            }
+        }
+
+    except Exception as e:
+        error_detail = str(e)
+        invoice_ref = data.get("invoice") if data else None
+        frappe.log_error(
+            message="Error creating credit note for " + str(invoice_ref) + ": " + error_detail,
+            title="Credit Note Creation Error"
+        )
+        fail_msg = _("Failed to create credit note: {0}")
+        frappe.throw(fail_msg.format(error_detail))

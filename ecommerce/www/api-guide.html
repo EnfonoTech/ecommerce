@@ -144,6 +144,7 @@
     <a href="#item-sync" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.99 6.57 2.64"/><polyline points="21 3 21 9 15 9"/></svg>Item Sync (in)</a>
     <a href="#sales-invoice" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>Create Sales Invoice (out)</a>
     <a href="#credit-note" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><polyline points="3 3 3 8 8 8"/></svg>Create Credit Note (out)</a>
+    <a href="#gst-errors" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>GST &amp; Error Responses</a>
 
     <div class="nav-group-label">Reference</div>
     <a href="#errors" class="nav-item"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Known Issue &amp; Fix</a>
@@ -159,9 +160,9 @@
   <div class="page-header">
     <div class="tag">API Integration Guide</div>
     <h1>Spice Nutrition ⇄ ERPNext</h1>
-    <p>Everything the website backend needs to call ERPNext correctly: credentials, call order, request/response shapes, and the one known bug blocking orders today.</p>
+    <p>Everything the website backend needs to call ERPNext correctly: credentials, call order, request/response shapes, GST and error handling, and the website-side issues still blocking orders today.</p>
     <div class="meta">
-      <div class="meta-item"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Sep 2026</div>
+      <div class="meta-item"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Updated 7 Oct 2026</div>
       <div class="meta-item"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>ERPNext v15 · ecommerce app</div>
     </div>
   </div>
@@ -320,12 +321,32 @@ Content-Type: application/json</code></pre>
     "email": "john@example.com"
   },
   "items": [
-    { "item_code": "SD-PR-1000", "qty": 1, "rate": 3499 }
+    { "item_code": "MB-G-0003", "qty": 1, "rate": 60 }
   ],
   "order_ref": "your-internal-order-id",
   "discount_amount": 0,
   "wallet_points": 0
 }</code></pre>
+
+      <p style="font-size:13.5px;color:#475569;margin-top:16px;font-weight:700;">Ready-to-run curl (tested live on 7 Oct 2026)</p>
+      <pre><code>curl --request POST \
+  --url https://spicenutrition.enfonoerp.com/api/method/ecommerce.apis.create.create_sales_invoice \
+  --header 'authorization: token 8bb68844e36bc72:d82ed035292e259' \
+  --header 'content-type: application/json' \
+  --data '{
+  "customer": "9044120147",
+  "customer_details": {
+    "name": "John Doe",
+    "phone": "9044120147",
+    "email": "john@example.com"
+  },
+  "items": [
+    { "item_code": "MB-G-0003", "qty": 1, "rate": 60 }
+  ],
+  "order_ref": "your-internal-order-id",
+  "discount_amount": 0,
+  "wallet_points": 0
+}'</code></pre>
 
       <table class="field-table">
         <thead><tr><th>Field</th><th>Description</th><th>Note</th></tr></thead>
@@ -337,24 +358,29 @@ Content-Type: application/json</code></pre>
         </tbody>
       </table>
 
-      <p style="font-size:13.5px;color:#475569;margin-top:16px;font-weight:700;">Success response (200)</p>
+      <p style="font-size:13.5px;color:#475569;margin-top:16px;font-weight:700;">Success response (200) — the real response from the curl above</p>
       <pre><code>{
-  "status": "success",
-  "message": "Sales Invoice created and submitted successfully",
-  "sales_invoice": {
-    "name": "SINV-26-00042",
-    "customer": "John Doe",
-    "grand_total": 3499,
-    "net_total": 3499,
-    "outstanding_amount": 3499,
-    "update_stock": 1,
-    "docstatus": 1
+  "message": {
+    "status": "success",
+    "message": "Sales Invoice created and submitted successfully",
+    "sales_invoice": {
+      "name": "SINV-26-00009",
+      "customer": "John Doe",
+      "posting_date": "2026-10-07",
+      "grand_total": 70.8,
+      "net_total": 60.0,
+      "outstanding_amount": 70.8,
+      "discount_amount": null,
+      "update_stock": 1,
+      "docstatus": 1
+    }
   }
 }</code></pre>
+      <p style="font-size:12.5px;color:#64748b;">Store <code>message.sales_invoice.name</code> against your order — you need it to create a credit note later. Note <code>grand_total</code> (70.8) is higher than <code>net_total</code> (60.0): 18% GST was added on top of the rate you sent (see "GST &amp; Error Responses" below). That test invoice was cancelled and removed afterwards, so the name above will not exist.</p>
 
       <div class="info-box green">
         <svg viewBox="0 0 24 24" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg>
-        Verified working live (Sept 2026): submitted invoice, stock deducted by exactly the ordered qty (checked against the item's Bin quantity before/after), auto-creates the Customer on first order and reuses it by phone/email on repeat orders.
+        Verified working live (7 Oct 2026, item MB-G-0003, qty 1): invoice submitted, stock went 1000 → 999 in the Stores warehouse, 18% GST applied (9% SGST + 9% CGST), the Customer was auto-created from <code>customer_details</code>, and the stock change was pushed to your <code>/webhooks/product-sync</code> receiver. Cancelling the invoice pushed stock back to 1000 the same way. Repeat orders reuse the Customer by phone/email.
       </div>
 
       <div class="info-box amber">
@@ -417,7 +443,44 @@ Content-Type: application/json</code></pre>
 
       <div class="info-box green">
         <svg viewBox="0 0 24 24" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg>
-        Verified working live (Sept 2026): full return tested against a real invoice — stock returned to exactly its pre-sale quantity, invoice correctly linked via <code>return_against</code>.
+        Verified working live (Sept 2026): a full return and a partial return (1 of 4 units) were each tested against a real invoice — stock came back by exactly the returned quantity, the credit note is linked via <code>return_against</code>, and the reversed stock is pushed to your receiver like any other stock change.
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <!-- GST & ERRORS -->
+    <section class="section" id="gst-errors">
+      <div class="section-title"><div class="icon-wrap ic-amber"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>GST &amp; Error Responses</div>
+      <div class="section-subtitle">How tax is applied to the invoice, and what can come back instead of a success.</div>
+
+      <div class="callout blue">
+        <h4>HSN code check is switched off (7 Oct 2026)</h4>
+        ERPNext's GST Settings used to reject any invoice containing an item with no HSN/SAC code (<code>HSN/SAC must exist and should be 6 or 8 digits long</code>). Almost every item in the catalogue has no HSN yet, so that check made nearly every order fail. It has been switched off, so you will <strong>not</strong> get that error any more and items without an HSN can be invoiced. The invoices simply carry no HSN code until Enfono/Spice fill them in on the items.
+      </div>
+
+      <div class="info-box amber">
+        <svg viewBox="0 0 24 24" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span><strong>GST is added on top of the <code>rate</code> you send.</strong> ERPNext applies 18% (9% SGST + 9% CGST) to the rate, so <code>rate: 60</code> gives <code>grand_total: 70.8</code>. If the prices shown on your website already include GST, send the tax-exclusive rate (price ÷ 1.18) or the invoice total will be higher than what the customer paid. If you would rather have ERPNext treat the rate as GST-inclusive, ask Enfono to change it — don't work around it silently.</span>
+      </div>
+
+      <p style="font-size:13.5px;color:#475569;margin-top:16px;font-weight:700;">Errors you can get back</p>
+      <p style="font-size:13px;color:#475569;margin-bottom:8px;">A failed call returns a non-2xx HTTP status (ERPNext validation errors come back as 417) with the reason in the response body, and the whole call is rolled back — no partial invoice is left behind. The reason text starts with <code>Failed to create Sales Invoice:</code> or <code>Failed to create credit note:</code>.</p>
+      <table class="field-table">
+        <thead><tr><th>Reason in the response</th><th>What it means</th><th>What to do</th></tr></thead>
+        <tbody>
+          <tr><td class="field-name">N units of Item X needed in Warehouse Y to complete this transaction</td><td>Not enough stock — ERPNext will not let stock go negative.</td><td>Check <code>available_stock</code> (from product-sync) before taking payment. If it still happens, refund/hold the order — no invoice was created.</td></tr>
+          <tr><td class="field-name">Item X does not exist</td><td>The <code>item_code</code> isn't in ERPNext (mistyped, deleted, or never synced).</td><td>Only use item codes that came from the product-sync payload.</td></tr>
+          <tr><td class="field-name">Customer is required / At least one item is required / Item code is required for all items</td><td>Missing field in the request body.</td><td>Fix the request.</td></tr>
+          <tr><td class="field-name">Customer does not exist and no customer_details were provided to create one</td><td><code>customer</code> isn't a known Customer and there was no <code>customer_details</code> to create one from.</td><td>Always send <code>customer_details</code> (name + phone or email).</td></tr>
+          <tr><td class="field-name">Sales Invoice X is not submitted / is already a credit note / does not exist</td><td>Credit-note call against an invoice that can't be reversed (or was already reversed as a credit note).</td><td>Use the <code>sales_invoice.name</code> returned by the original order call.</td></tr>
+          <tr><td class="field-name">No default warehouse configured for item X</td><td>The item has no warehouse set for stock deduction.</td><td>Tell Enfono — it's an ERPNext data fix, not something to retry.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="info-box red">
+        <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        An order invoice is created only if the call returns <code>"status": "success"</code>. If you capture payment first and the call then fails (for example out of stock), you must refund or hold that order yourself — ERPNext has no record of it.
       </div>
     </section>
 
@@ -462,6 +525,8 @@ Content-Type: application/json</code></pre>
         <div class="badge grey"><span class="dot"></span>Point that call at <code>ecommerce.apis.create.create_sales_invoice</code> (not <code>sales_order</code> — that method no longer exists)</div>
         <div class="badge grey"><span class="dot"></span>Set the <code>Authorization: token &lt;key&gt;:&lt;secret&gt;</code> header exactly as shown above</div>
         <div class="badge grey"><span class="dot"></span>Wire up <code>create_credit_note</code> for your returns/cancellation flow</div>
+        <div class="badge grey"><span class="dot"></span>Send tax-exclusive <code>rate</code>s (ERPNext adds 18% GST on top) and store the returned invoice name against your order</div>
+        <div class="badge grey"><span class="dot"></span>Handle a failed call (e.g. out of stock): don't treat the order as invoiced, refund/hold it</div>
         <div class="badge grey"><span class="dot"></span>Place one real test order and confirm a submitted Sales Invoice appears in ERPNext with stock deducted (ask Enfono to check with you)</div>
         <div class="badge grey"><span class="dot"></span>Re-check customers who tried to order in the last 2+ weeks — their orders never reached ERPNext</div>
       </div>
@@ -471,7 +536,7 @@ Content-Type: application/json</code></pre>
 
     <div style="text-align:center;color:#94a3b8;font-size:12px;padding-bottom:48px;">
       <p>Spice Nutrition · ERPNext API Integration Guide · Developed by <strong style="color:#64748b;">Enfono Technologies</strong></p>
-      <p style="margin-top:4px;">ERPNext v15 · ecommerce app · Sept 2026</p>
+      <p style="margin-top:4px;">ERPNext v15 · ecommerce app · Updated 7 Oct 2026</p>
     </div>
 
   </div>
